@@ -234,6 +234,93 @@ Sndβ : ∀ {i j k Γ}{A : Ty {i} Γ j}{B : Ty (Γ ▶ A) k}{t : Tm Γ A}{u : Tm
        → Snd {B = B} (Pair {B = B} t u) ≡ u
 Sndβ = refl
 
+Sgη : ∀ {i j k Γ} {A : Ty {i} Γ j} {B : Ty (Γ ▶ A) k} {t : Tm Γ (Sg A B)}
+    → Pair {B = B} (Fst {B = B} t) (Snd {B = B} t) ≡ t
+Sgη = refl
+
+-- Positive/inductive/weak sigma
+--------------------------------------------------------------------------------
+
+data Sg* {i j} (A : Set i) (B : A → Set j) : Set (i ⊔ j) where
+  _,_ : (a : A) → (b : B a) → Sg* A B
+  err : Sg* A B
+
+Sg*-elim
+  : ∀ {i j k} {A : Set i} {B : A → Set j} (C : Sg* A B → Set k)
+  → (∀ a b → C (a , b))
+  → C err
+  → ∀ x → C x
+Sg*-elim C p e (a , b) = p a b
+Sg*-elim C p e err = e
+
+data Sgᴾ {i j} {A : Set i} (Aᴾ : A → Set i) {B : A → Set j} (Bᴾ : (a : A) → Aᴾ a → B a → Set j) : Sg* A B → Set (i ⊔ j) where
+  _,ᴾ_ : ∀ {a b} → (aᴾ : Aᴾ a) (bᴾ : Bᴾ a aᴾ b) → Sgᴾ Aᴾ Bᴾ (a , b)
+
+Sgᴾ-elim
+  : ∀ {i j k} {A : Set i} {Aᴾ : A → Set i} {B : A → Set j} {Bᴾ : (a : A) → Aᴾ a → B a → Set j}
+  → (C : (s : Sg* A B) → Sgᴾ Aᴾ Bᴾ s → Set k)
+  → (∀ a aᴾ b bᴾ → C (a , b) (aᴾ ,ᴾ bᴾ))
+  → ∀ s sᴾ → C s sᴾ
+Sgᴾ-elim C p (a , b) (aᴾ ,ᴾ bᴾ) = p a aᴾ b bᴾ
+
+Sg⁺ : ∀ {i j k Γ}(A : Ty {i} Γ j) → Ty (Γ ▶ A) k → Ty Γ (j ⊔ k)
+S (Sg⁺ A B) γ = Sg* (A . S γ) λ α → B .S (γ , α)
+P (Sg⁺ A B) γ γᴾ = Sgᴾ (A .P γ γᴾ) (λ α αᴾ → B .P (γ , α) (γᴾ , αᴾ))
+E (Sg⁺ A B) γ = err
+
+Sg⁺[] : ∀ {i' i j k Δ Γ A B}{σ : Sub {i'}{i} Δ Γ}
+        → Sg⁺ {i}{j}{k}{Γ} A B [ σ ]T ≡ Sg⁺ {i'}{j}{k}{Δ} (A [ σ ]T) (B [ lift σ A ]T)
+Sg⁺[] = refl
+
+Pair⁺ : ∀ {i j k Γ}{A : Ty {i} Γ j}{B : Ty (Γ ▶ A) k} → (t : Tm Γ A) → Tm Γ (B [ id ,ₛ t ]T) → Tm Γ (Sg⁺ A B)
+S (Pair⁺ t u) γ    = (t .S γ) , u .S γ
+P (Pair⁺ t u) γ γᴾ = (t .P γ γᴾ) ,ᴾ (u .P γ γᴾ)
+
+Pair⁺[] : ∀ {σ : Sub {l}{i} Δ Γ} → Pair⁺ {i}{j}{k}{Γ}{A}{B} t u [ σ ] ≡
+                                   Pair⁺ {l}{j}{k}{Δ}{A [ σ ]T} {B [ lift σ A ]T} (t [ σ ]) (u [ σ ])
+Pair⁺[] = refl
+
+psub : ∀ Γ (A : Ty {i} Γ j) (B : Ty (Γ ▶ A) k) → Sub (Γ ▶ A ▶ B) (Γ ▶ Sg⁺ A B)
+S (psub Γ A B) γ    = γ .₁ .₁ , γ .₁ .₂ , γ .₂
+P (psub Γ A B) γ γᴾ = γᴾ .₁ .₁ , (γᴾ .₁ .₂ ,ᴾ γᴾ .₂)
+
+Sg⁺Elim
+  : ∀ {i j k l Γ}{A : Ty {i} Γ j}{B : Ty (Γ ▶ A) k}
+  → (C : Ty (Γ ▶ Sg⁺ A B) l)
+  → Tm (Γ ▶ A ▶ B) (C [ psub Γ A B ]T)
+  → (p : Tm Γ (Sg⁺ A B))
+  → Tm Γ (C [ id ,ₛ p ]T)
+Sg⁺Elim {Γ = Γ} {A} {B} C c p .S γ = Sg*-elim
+  (λ x → C .S (γ , x))
+  (λ a b → c .S ((γ , a) , b))
+  (C .E (γ , err))
+  (p .S γ)
+Sg⁺Elim {Γ = Γ} {A} {B} C c p .P γ γᴾ = Sgᴾ-elim
+  (λ s sᴾ → C .P (γ , s) (γᴾ , sᴾ) (Sg*-elim (λ x → C .S (γ , x)) _ _ s))
+  (λ a aᴾ b bᴾ → c .P ((γ , a) , b) ((γᴾ , aᴾ) , bᴾ))
+  (p .S γ)
+  (p .P γ γᴾ)
+
+Sg⁺Elim[]
+  : ∀ {i' i j k l Δ Γ A B C c p} {σ : Sub {i'} {i} Δ Γ}
+  → Sg⁺Elim {i}{j}{k}{l}{Γ}{A}{B} C c p [ σ ]
+  ≡ Sg⁺Elim {A = A [ σ ]T} {B = B [ lift σ A ]T} (C [ lift σ (Sg⁺ A B) ]T) (c [ lift (lift σ A) B ]) (p [ σ ])
+Sg⁺Elim[] = refl
+
+Sg⁺β
+  : ∀ {i j k l Γ A B C c a b}
+  → Sg⁺Elim {i}{j}{k}{l}{Γ}{A}{B} C c (Pair⁺ {A = A} {B} a b) ≡ c [ _,ₛ_ {A = B} (id ,ₛ a) b ]
+Sg⁺β = refl
+
+Fst⁺ : Tm Γ (Sg⁺ A B) → Tm Γ A
+Fst⁺ {A = A} {B = B} t = Sg⁺Elim {A = A} {B = B} (A [ p (Sg⁺ A B) ]T) (q A [ p B ]) t
+
+Snd⁺ : ∀ {i j k Γ}{A : Ty Γ j}{B : Ty (Γ ▶ A) k}(t : Tm {i} Γ (Sg⁺ A B)) → Tm Γ (B [ id ,ₛ Fst⁺ {A = A} {B = B} t ]T)
+Snd⁺ {A = A} {B = B} t = Sg⁺Elim {A = A} {B = B}
+  (B [ p (Sg⁺ A B) ,ₛ Fst⁺ {A = A [ p (Sg⁺ A B) ]T} {B = B [ lift (p (Sg⁺ A B)) A ]T} (q (Sg⁺ A B)) ]T)
+  (q B)
+  t
+
 -- Nat
 --------------------------------------------------------------------------------
 
@@ -417,4 +504,33 @@ module NoFunExt where
 
   ¬FunExt : (∀ {i j k} → FunExtTy {i}{j}{k}) → ⊥
   ¬FunExt fext with ap (λ f → f false) (lem (fext {A = One} f g e . P _ _))
+  ... | ()
+
+  -- By the same argument, this model does not validate
+  --   (λ x → (fst x , snd x)) ≡ (λ x → x)
+  -- when positive/inductive/weak Σ-types are used, because the functions
+  -- treat errors differently.
+  -- (If negative/coinductive/strong Σ-types are used instead, the equality
+  -- follows from η rules.)
+
+  Empty : Ty Γ lzero
+  S Empty _     = ⊤
+  P Empty _ _ x = ⊥
+  E Empty _     = tt
+
+  Endo : ∀ {i j Γ} → Ty {i} Γ j → Ty Γ j
+  Endo A = Pi A (A [ p A ]T)
+
+  LemmaTy : ∀ {i j k} → Set _
+  LemmaTy {i} {j} {k} =
+    ∀ {Γ A B}
+    → Tm Γ (Id (Endo (Sg⁺ {i} {j} {k} A B))
+      (Lam {A = Sg⁺ A B}
+        (Pair⁺ {A = A [ p (Sg⁺ A B) ]T} {B = B [ lift (p (Sg⁺ A B)) A ]T}
+          (Fst⁺ {B = B [ lift (p (Sg⁺ A B)) A ]T} (q _))
+          (Snd⁺ {B = B [ lift (p (Sg⁺ A B)) A ]T} (q _))))
+      (Lam {A = Sg⁺ A B} (q _)))
+
+  ¬Lemma : (∀ {i j k} → LemmaTy {i} {j} {k}) → ⊥
+  ¬Lemma lemma with ap (λ f → f err) (lem (lemma {Γ = ∙} {A = Empty} {B = Empty} .P _ _))
   ... | ()
