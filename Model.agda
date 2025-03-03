@@ -198,7 +198,7 @@ Piβ = refl
 Piη : Lam {i}{Γ}{j}{A}{k} (App t) ≡ t
 Piη = refl
 
--- Sigma
+-- Negative/coinductive sigma
 --------------------------------------------------------------------------------
 
 Sg : ∀ {i j k Γ}(A : Ty {i} Γ j) → Ty (Γ ▶ A) k → Ty Γ (j ⊔ k)
@@ -238,7 +238,7 @@ Sgη : ∀ {i j k Γ} {A : Ty {i} Γ j} {B : Ty (Γ ▶ A) k} {t : Tm Γ (Sg A B
     → Pair {B = B} (Fst {B = B} t) (Snd {B = B} t) ≡ t
 Sgη = refl
 
--- Positive/inductive/weak sigma
+-- Positive/inductive sigma
 --------------------------------------------------------------------------------
 
 data Sg* {i j} (A : Set i) (B : A → Set j) : Set (i ⊔ j) where
@@ -471,7 +471,122 @@ J'[] : ∀ {i' i j k}{Δ Γ}{σ : Sub {i'}{i} Δ Γ}{A a B br a' e}
      ≡ J' {i'}{j}{k}{Δ}{A [ σ ]T}{a [ σ ]} (B [ liftσ σ a ]T) (br [ σ ]) (a' [ σ ]) (e [ σ ])
 J'[] = refl
 
+-- Empty type
+--------------------------------------------------------------------------------
 
+Empty : Ty Γ lzero
+S Empty _     = ⊤
+P Empty _ _ _ = ⊥
+E Empty _     = tt
+
+Empty[] : ∀ {i' i Δ Γ}{σ : Sub {i'}{i} Δ Γ}
+          → Empty [ σ ]T ≡ Empty
+Empty[] = refl
+
+EmptyElim
+  : ∀ {i j Γ}
+  → (C : Ty {i} (Γ ▶ Empty) j)
+  → (p : Tm Γ Empty)
+  → Tm Γ (C [ id ,ₛ p ]T)
+EmptyElim {Γ = Γ} C p .S γ = C .E (γ , p .S γ)
+EmptyElim {Γ = Γ} C p .P γ γᴾ = ⊥-elim (p .P γ γᴾ)
+
+EmptyElim[]
+  : ∀ {i' i j Δ Γ C p} {σ : Sub {i'} {i} Δ Γ}
+  → EmptyElim {i}{j}{Γ} C p [ σ ]
+  ≡ EmptyElim (C [ lift σ Empty ]T) (p [ σ ])
+EmptyElim[] = refl
+
+Empty-irrelevant
+  : ∀ {i Γ} {t u : Tm {i} Γ Empty}
+  → t ≡ u
+Empty-irrelevant = refl
+
+-- Negative/coinductive unit type
+--------------------------------------------------------------------------------
+
+One : Ty Γ lzero
+S One _     = ⊤
+P One _ _ x = ⊤
+E One _     = tt
+
+One[] : ∀ {i' i Δ Γ}{σ : Sub {i'}{i} Δ Γ}
+        → One [ σ ]T ≡ One
+One[] = refl
+
+Star : ∀ {i Γ} → Tm {i} Γ One
+Star .S γ = tt
+Star .P γ γᴾ = tt
+
+Star[] : ∀ {σ : Sub {l}{i} Δ Γ} → Star {i} [ σ ] ≡ Star {l}
+Star[] = refl
+
+Oneη : ∀ {i Γ} {t : Tm {i} Γ One}
+     → Star ≡ t
+Oneη = refl
+
+-- Positive/inductive unit type
+--------------------------------------------------------------------------------
+
+One⁺ : Ty Γ lzero
+S One⁺ _     = Bool
+P One⁺ _ _ x = x ≡ true
+E One⁺ _     = false
+
+One⁺[] : ∀ {i' i Δ Γ}{σ : Sub {i'}{i} Δ Γ}
+         → One⁺ [ σ ]T ≡ One⁺
+One⁺[] = refl
+
+Star⁺ : ∀ {i Γ} → Tm {i} Γ One⁺
+Star⁺ .S γ = true
+Star⁺ .P γ γᴾ = refl
+
+Star⁺[] : ∀ {σ : Sub {l}{i} Δ Γ} → Star⁺ {i} [ σ ] ≡ Star⁺ {l}
+Star⁺[] = refl
+
+Bool-elim
+  : ∀ {i} (C : Bool → Set i)
+  → C true
+  → C false
+  → ∀ x → C x
+Bool-elim C p e true = p
+Bool-elim C p e false = e
+
+One⁺ᴾ-elim
+  : ∀ {i} (C : (b : Bool) → b ≡ true → Set i)
+  → C true refl
+  → ∀ b bᴾ → C b bᴾ
+One⁺ᴾ-elim C p .true refl = p
+
+One⁺Elim
+  : ∀ {i j Γ}
+  → (C : Ty {i} (Γ ▶ One⁺) j)
+  → Tm Γ (C [ id ,ₛ Star⁺ ]T)
+  → (p : Tm Γ One⁺)
+  → Tm Γ (C [ id ,ₛ p ]T)
+One⁺Elim C c p .S γ = Bool-elim
+  (λ b → C .S (γ , b))
+  (c .S γ)
+  (C .E (γ , false))
+  (p .S γ)
+One⁺Elim C c p .P γ γᴾ = One⁺ᴾ-elim
+  (λ b bᴾ → C .P (γ , b) (γᴾ , bᴾ) (Bool-elim (λ b → C .S (γ , b)) _ _ _))
+  (c .P γ γᴾ)
+  (p .S γ)
+  (p .P γ γᴾ)
+
+One⁺Elim[]
+  : ∀ {i' i j Δ Γ C c p} {σ : Sub {i'} {i} Δ Γ}
+  → One⁺Elim {i}{j}{Γ} C c p [ σ ]
+  ≡ One⁺Elim (C [ lift σ One⁺ ]T) (c [ σ ]) (p [ σ ])
+One⁺Elim[] = refl
+
+One⁺β
+  : ∀ {i j Γ C c}
+  → One⁺Elim {i}{j}{Γ} C c Star⁺ ≡ c
+One⁺β = refl
+
+-- Failure of function extensionality
 --------------------------------------------------------------------------------
 
 module NoFunExt where
@@ -481,20 +596,20 @@ module NoFunExt where
            → Tm (Γ ▶ A) (Id B (App {A = A} f) (App {A = A} g))
            → Tm Γ (Id (Pi A B) f g)
 
-  One : Ty Γ lzero
-  S One _     = Bool
-  P One _ _ x = x ≡ true
-  E One _     = false
+  -- Using the positive/inductive unit type, we can define two functions
+  -- ⊤ → ⊤ with different intensional behaviour: one propagates
+  -- errors while the other doesn't.
 
-  f : Tm Γ (Pi One One)
+  f : Tm Γ (Pi One⁺ One⁺)
   S f _ x = x
   P f _ _ _ refl = refl
 
-  g : Tm Γ (Pi One One)
+  g : Tm Γ (Pi One⁺ One⁺)
   S g _ _ = true
   P g _ _ _ _ = refl
 
-  e : Tm (∙ ▶ One) (Id One (App {A = One} f) (App {A = One} g))
+  -- The functions are pointwise equal on the non-error element of ⊤...
+  e : Tm (∙ ▶ One⁺) (Id One⁺ (App {A = One⁺} f) (App {A = One⁺} g))
   S e   (_ , true)  = refl
   S e   (_ , false) = err true
   P e _ (_ , refl ) = refl refl
@@ -502,21 +617,17 @@ module NoFunExt where
   lem : ∀ {i A Aᴾ x y xᴾ yᴾ e} → Idᴾ {i}{A} Aᴾ {x}{y} xᴾ yᴾ e → x ≡ y
   lem (refl _) = refl
 
+  -- ...but they are not equal as functions, so funext fails.
   ¬FunExt : (∀ {i j k} → FunExtTy {i}{j}{k}) → ⊥
-  ¬FunExt fext with ap (λ f → f false) (lem (fext {A = One} f g e . P _ _))
+  ¬FunExt fext with ap (λ f → f false) (lem (fext {A = One⁺} f g e . P _ _))
   ... | ()
 
-  -- By the same argument, this model does not validate
+  -- By a similar argument, this model does not validate
   --   (λ x → (fst x , snd x)) ≡ (λ x → x)
-  -- when positive/inductive/weak Σ-types are used, because the functions
+  -- when positive/inductive Σ-types are used, because the functions
   -- treat errors differently.
-  -- (If negative/coinductive/strong Σ-types are used instead, the equality
+  -- (If negative/coinductive Σ-types are used instead, the equality
   -- follows from η rules.)
-
-  Empty : Ty Γ lzero
-  S Empty _     = ⊤
-  P Empty _ _ x = ⊥
-  E Empty _     = tt
 
   Endo : ∀ {i j Γ} → Ty {i} Γ j → Ty Γ j
   Endo A = Pi A (A [ p A ]T)
@@ -534,3 +645,11 @@ module NoFunExt where
   ¬Lemma : (∀ {i j k} → LemmaTy {i} {j} {k}) → ⊥
   ¬Lemma lemma with ap (λ f → f err) (lem (lemma {Γ = ∙} {A = Empty} {B = Empty} .P _ _))
   ... | ()
+
+module NegationIrrelevance where
+  -- On the other hand, since the empty type is definitionally irrelevant
+  -- inside this model, we get "negation irrelevance": any two functions
+  -- into the empty type are definitionally equal.
+
+  NegationIrrelevance : ∀ {i j Γ A}(f g : Tm Γ (Pi {i}{j} A Empty)) → f ≡ g
+  NegationIrrelevance f g = refl
