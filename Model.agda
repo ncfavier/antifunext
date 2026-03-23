@@ -29,6 +29,7 @@ record Con i : Set (lsuc i) where
   field
     S : Set i
     P : S → Set i
+    E : S
 open Con
 
 record Sub (Γ : Con i)(Δ : Con j) : Set (i ⊔ j) where
@@ -60,6 +61,12 @@ variable
 ∙ : Con lzero
 S ∙   = ⊤
 P ∙ _ = ⊤
+E ∙   = tt
+
+Con→Ty : Con i → Ty ∙ i
+Con→Ty Γ .S _ = Γ .S
+Con→Ty Γ .P _ _ = Γ .P
+Con→Ty Γ .E _ = Γ .E
 
 ε : Sub Γ ∙
 S ε _   = tt
@@ -72,6 +79,7 @@ infixl 3 _▶_
 _▶_ : (Γ : Con i) → Ty Γ j → Con (i ⊔ j)
 S (Γ ▶ A)         = Σ (Γ .S) (A .S)
 P (Γ ▶ A) (γ , α) = Σ (Γ .P γ) λ γᴾ → A .P γ γᴾ α
+E (Γ ▶ A)         = Γ .E , A .E (Γ .E)
 
 id : Sub Γ Γ
 S id γ    = γ
@@ -192,10 +200,10 @@ App : ∀ {i j k Γ A B} → Tm Γ (Pi {i}{j = j}{k = k} A B) → Tm (Γ ▶ A) 
 S (App t) (γ , x)           = t .S γ x
 P (App t) (γ , x) (γᴾ , xᴾ) = t .P γ γᴾ x xᴾ
 
-Piβ : App {i}{j}{k}{Γ}{A} (Lam t) ≡ t
+Piβ : App {i}{j}{k}{Γ}{A} (Lam {A = A} t) ≡ t
 Piβ = refl
 
-Piη : Lam {i}{Γ}{j}{A}{k} (App t) ≡ t
+Piη : Lam {i}{Γ}{j}{A}{k} (App {A = A} t) ≡ t
 Piη = refl
 
 -- Negative/coinductive sigma
@@ -638,8 +646,8 @@ module NoFunExt where
     → Tm Γ (Id (Endo (Sg⁺ {i} {j} {k} A B))
       (Lam {A = Sg⁺ A B}
         (Pair⁺ {A = A [ p (Sg⁺ A B) ]T} {B = B [ lift (p (Sg⁺ A B)) A ]T}
-          (Fst⁺ {B = B [ lift (p (Sg⁺ A B)) A ]T} (q _))
-          (Snd⁺ {B = B [ lift (p (Sg⁺ A B)) A ]T} (q _))))
+          (Fst⁺ {B = B [ lift (p (Sg⁺ A B)) A ]T} (q (Sg⁺ A B)))
+          (Snd⁺ {B = B [ lift (p (Sg⁺ A B)) A ]T} (q (Sg⁺ A B)))))
       (Lam {A = Sg⁺ A B} (q _)))
 
   ¬Lemma : (∀ {i j k} → LemmaTy {i} {j} {k}) → ⊥
