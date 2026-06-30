@@ -401,7 +401,6 @@ NatElimSuc : ∀{i j Γ B z s n}
              ≡ s [ _,ₛ_ {A = B} (id ,ₛ n)  (NatElim B z s n) ]
 NatElimSuc = refl
 
-
 -- Id
 --------------------------------------------------------------------------------
 
@@ -627,7 +626,7 @@ module NoFunExt where
 
   -- ...but they are not equal as functions, so funext fails.
   ¬FunExt : (∀ {i j k} → FunExtTy {i}{j}{k}) → ⊥
-  ¬FunExt fext with ap (λ f → f false) (lem (fext {A = One⁺} f g e . P _ _))
+  ¬FunExt fext with ap (λ f → f false) (lem (fext {A = One⁺} f g e .P _ _))
   ... | ()
 
   -- By a similar argument, this model does not validate
@@ -652,6 +651,24 @@ module NoFunExt where
 
   ¬Lemma : (∀ {i j k} → LemmaTy {i} {j} {k}) → ⊥
   ¬Lemma lemma with ap (λ f → f err) (lem (lemma {Γ = ∙} {A = Empty} {B = Empty} .P _ _))
+  ... | ()
+
+  -- By yet another similar argument, this model does not validate
+  --   (λ x y → x + y) ≡ (λ x y → y + x)
+  -- because when x = err and y = 1, the LHS is err and the RHS is suc err.
+
+  infixl 4 _+_
+  _+_ : ∀ {i}{Γ : Con i} → (n m : Tm Γ Nat) → Tm Γ Nat
+  _+_ n m = NatElim Nat m (Suc (q _)) n
+
+  Plus : Tm ∙ (Pi Nat (Pi Nat Nat))
+  Plus = Lam {A = Nat} (Lam {A = Nat} (q _ [ p Nat ] + q _))
+
+  FlipPlus : Tm ∙ (Pi Nat (Pi Nat Nat))
+  FlipPlus = Lam {A = Nat} (Lam {A = Nat} (q _ + q _ [ p Nat ]))
+
+  Plus≠FlipPlus : Tm ∙ (Id _ Plus FlipPlus) → ⊥
+  Plus≠FlipPlus eq with ap (λ f → f err (suc zero)) (lem (eq .P _ _))
   ... | ()
 
 module NegationIrrelevance where
